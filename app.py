@@ -9,23 +9,44 @@ from dotenv import load_dotenv
 from flask import Flask, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from supabase import Client, create_client
 from supabase.lib.client_options import ClientOptions
-from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 load_dotenv()
 
-app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__, template_folder=os.path.join(BASE_DIR, "templates"))
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "change-me")
+
+CONFIG_ERRORS = []
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        CONFIG_ERRORS.append(f"{name} must be a number")
+        return default
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        CONFIG_ERRORS.append(f"{name} must be an integer")
+        return default
+
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "prescriptions")
-SUPABASE_STORAGE_TIMEOUT = float(os.getenv("SUPABASE_STORAGE_TIMEOUT", "10"))
-SUPABASE_DB_TIMEOUT = float(os.getenv("SUPABASE_DB_TIMEOUT", "20"))
-MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", "10"))
+SUPABASE_STORAGE_TIMEOUT = _env_float("SUPABASE_STORAGE_TIMEOUT", 10.0)
+SUPABASE_DB_TIMEOUT = _env_float("SUPABASE_DB_TIMEOUT", 20.0)
+MAX_UPLOAD_SIZE_MB = _env_int("MAX_UPLOAD_SIZE_MB", 10)
 
-CONFIG_ERRORS = []
 if not SUPABASE_URL:
     CONFIG_ERRORS.append("Missing SUPABASE_URL")
 if not SUPABASE_SERVICE_ROLE_KEY:
@@ -45,7 +66,7 @@ if not CONFIG_ERRORS:
 STARTUP_ERROR = "; ".join(CONFIG_ERRORS)
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
-PUBLIC_DIR = os.path.join(app.root_path, "public")
+PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 
@@ -128,6 +149,15 @@ def style_css():
 def handle_file_too_large(_exc):
     flash(f"File too large. Maximum allowed size is {MAX_UPLOAD_SIZE_MB}MB.", "error")
     return redirect(url_for("dashboard"))
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(exc):
+    if isinstance(exc, HTTPException):
+        return exc
+    app.logger.exception("Unhandled application error")
+    message = f"{type(exc).__name__}: {exc}"
+    return f"Internal Server Error - {message}", 500
 
 
 @app.route("/register", methods=["GET", "POST"])
