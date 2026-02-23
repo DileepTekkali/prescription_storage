@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card auth-card">
+  <div class="panel-head">
+    <div>
+      <p class="eyebrow">Welcome</p>
+      <h2>Login</h2>
+      <p class="small-text">Access your prescription dashboard securely.</p>
+    </div>
+  </div>
+
+  <form method="post" class="form-grid">
+    <div class="field">
+      <label for="email">Gmail</label>
+      <input type="email" id="email" name="email" placeholder="example@gmail.com" required />
+    </div>
+
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required />
+    </div>
+
+    <div class="form-actions">
+      <button type="submit">Login</button>
+    </div>
+  </form>
+
+  <p class="small-text">
+    New user? <a href="{{ url_for('register') }}">Register here</a>.
+  </p>
+</section>
+{% endblock %}

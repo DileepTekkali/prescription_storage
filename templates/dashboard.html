@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="panel-head">
+    <div>
+      <p class="eyebrow">Workspace</p>
+      <h2>Upload Prescription</h2>
+      <p class="small-text">Attach an image and prescription date to save the record.</p>
+    </div>
+    <div class="pill">{{ session.get("username") }} | {{ session.get("email") }}</div>
+  </div>
+
+  <form method="post" action="{{ url_for('upload_prescription') }}" enctype="multipart/form-data" class="form-grid">
+    <div class="field">
+      <label for="prescription_date">Prescription Date</label>
+      <input type="date" id="prescription_date" name="prescription_date" required />
+    </div>
+
+    <div class="field">
+      <label for="image">Prescription Image</label>
+      <input type="file" id="image" name="image" accept="image/png,image/jpeg,image/webp" required />
+    </div>
+
+    <div class="form-actions">
+      <button type="submit">Upload</button>
+      <a class="button-link secondary" href="{{ url_for('prescriptions') }}">View All Prescriptions</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

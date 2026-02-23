@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="panel-head">
+    <div>
+      <p class="eyebrow">Library</p>
+      <h2>All Prescriptions</h2>
+    </div>
+    <a class="button-link secondary" href="{{ url_for('dashboard') }}">Back to Upload</a>
+  </div>
+
+  {% if prescriptions %}
+  <div class="prescription-grid">
+    {% for item in prescriptions %}
+    <article class="prescription-card">
+      <div class="image-frame">
+        <img src="{{ item.image_url }}" alt="Prescription Image" loading="lazy" />
+      </div>
+      <div class="prescription-meta">
+        <p><strong>Date:</strong> {{ item.prescription_date }}</p>
+        {% if item.users %}
+        <p>
+          <strong>User:</strong>
+          {% if item.users is mapping %}
+          {{ item.users.username }} ({{ item.users.email }})
+          {% elif item.users|length > 0 %}
+          {{ item.users[0].username }} ({{ item.users[0].email }})
+          {% endif %}
+        </p>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">No prescriptions found yet. Upload one from the dashboard.</div>
+  {% endif %}
+</section>
+{% endblock %}

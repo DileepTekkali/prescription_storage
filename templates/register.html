@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card auth-card">
+  <div class="panel-head">
+    <div>
+      <p class="eyebrow">Create Account</p>
+      <h2>Register</h2>
+      <p class="small-text">Set up your profile to upload and manage prescriptions.</p>
+    </div>
+  </div>
+
+  <form method="post" class="form-grid">
+    <div class="field">
+      <label for="email">Gmail</label>
+      <input type="email" id="email" name="email" placeholder="example@gmail.com" required />
+    </div>
+
+    <div class="field">
+      <label for="username">User Name</label>
+      <input type="text" id="username" name="username" required />
+    </div>
+
+    <div class="field">
+      <label for="age">Age</label>
+      <input type="number" id="age" name="age" min="1" required />
+    </div>
+
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" minlength="6" required />
+    </div>
+
+    <div class="form-actions">
+      <button type="submit">Create Account</button>
+    </div>
+  </form>
+
+  <p class="small-text">
+    Already registered? <a href="{{ url_for('login') }}">Login here</a>.
+  </p>
+</section>
+{% endblock %}

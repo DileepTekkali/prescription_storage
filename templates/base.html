@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prescription Portal</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand-link" href="{{ url_for('index') }}" aria-label="Go to home">
+          <div class="brand">
+            <h1 class="logo">Prescription Portal</h1>
+            <p class="logo-subtitle">Secure records, clean workflow</p>
+          </div>
+        </a>
+        <nav class="nav">
+          {% if session.get("user_id") %}
+          <a
+            class="nav-link {% if request.endpoint in ['index', 'dashboard'] %}is-active{% endif %}"
+            href="{{ url_for('dashboard') }}"
+            >Home</a
+          >
+          <a class="nav-link {% if request.endpoint == 'dashboard' %}is-active{% endif %}" href="{{ url_for('dashboard') }}"
+            >Dashboard</a
+          >
+          <a class="nav-link {% if request.endpoint == 'prescriptions' %}is-active{% endif %}" href="{{ url_for('prescriptions') }}"
+            >All Prescriptions</a
+          >
+          <a class="nav-link logout-link" href="{{ url_for('logout') }}">Logout</a>
+          {% else %}
+          <a class="nav-link {% if request.endpoint in ['index', 'login'] %}is-active{% endif %}" href="{{ url_for('index') }}">Home</a>
+          <a class="nav-link {% if request.endpoint == 'login' %}is-active{% endif %}" href="{{ url_for('login') }}">Login</a>
+          <a class="nav-link {% if request.endpoint == 'register' %}is-active{% endif %}" href="{{ url_for('register') }}">Register</a>
+          {% endif %}
+        </nav>
+      </div>
+    </header>
+
+    <main class="container page-main">
+      {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %}
+      <div class="messages">
+        {% for category, message in messages %}
+        <div class="alert {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %} {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>
