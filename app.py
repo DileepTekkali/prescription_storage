@@ -1,11 +1,12 @@
 import os
 import uuid
 from functools import wraps
+from typing import Optional
 from urllib.parse import quote
 
 import httpx
 from dotenv import load_dotenv
-from flask import Flask, flash, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from supabase import Client, create_client
 from supabase.lib.client_options import ClientOptions
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -24,14 +25,24 @@ SUPABASE_STORAGE_TIMEOUT = float(os.getenv("SUPABASE_STORAGE_TIMEOUT", "10"))
 SUPABASE_DB_TIMEOUT = float(os.getenv("SUPABASE_DB_TIMEOUT", "20"))
 MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", "10"))
 
-if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
-    raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env")
+CONFIG_ERRORS = []
+if not SUPABASE_URL:
+    CONFIG_ERRORS.append("Missing SUPABASE_URL")
+if not SUPABASE_SERVICE_ROLE_KEY:
+    CONFIG_ERRORS.append("Missing SUPABASE_SERVICE_ROLE_KEY")
 
-supabase_options = ClientOptions(
-    postgrest_client_timeout=SUPABASE_DB_TIMEOUT,
-    storage_client_timeout=SUPABASE_STORAGE_TIMEOUT,
-)
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, options=supabase_options)
+supabase: Optional[Client] = None
+if not CONFIG_ERRORS:
+    try:
+        supabase_options = ClientOptions(
+            postgrest_client_timeout=SUPABASE_DB_TIMEOUT,
+            storage_client_timeout=SUPABASE_STORAGE_TIMEOUT,
+        )
+        supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, options=supabase_options)
+    except Exception as exc:
+        CONFIG_ERRORS.append(f"Supabase client init failed: {exc}")
+
+STARTUP_ERROR = "; ".join(CONFIG_ERRORS)
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 PUBLIC_DIR = os.path.join(app.root_path, "public")
@@ -52,12 +63,21 @@ def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def get_supabase() -> Client:
+    if supabase is None:
+        raise RuntimeError(STARTUP_ERROR or "Supabase client not initialized")
+    return supabase
+
+
 def build_public_url(storage_path: str) -> str:
     safe_path = quote(storage_path, safe="/")
     return f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/public/{SUPABASE_STORAGE_BUCKET}/{safe_path}"
 
 
 def upload_to_storage(storage_path: str, file_bytes: bytes, content_type: str) -> None:
+    if STARTUP_ERROR:
+        raise RuntimeError(STARTUP_ERROR)
+
     safe_path = quote(storage_path, safe="/")
     upload_url = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/{SUPABASE_STORAGE_BUCKET}/{safe_path}"
     headers = {
@@ -90,6 +110,13 @@ def index():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
+
+
+@app.route("/health")
+def health():
+    if STARTUP_ERROR:
+        return jsonify({"ok": False, "error": STARTUP_ERROR}), 500
+    return jsonify({"ok": True}), 200
 
 
 @app.route("/style.css")
@@ -132,12 +159,13 @@ def register():
             return redirect(url_for("register"))
 
         try:
-            existing = supabase.table("users").select("id").eq("email", email).limit(1).execute()
+            db = get_supabase()
+            existing = db.table("users").select("id").eq("email", email).limit(1).execute()
             if existing.data:
                 flash("Email is already registered.", "error")
                 return redirect(url_for("register"))
 
-            result = supabase.table("users").insert(
+            result = db.table("users").insert(
                 {
                     "email": email,
                     "username": username,
@@ -170,8 +198,9 @@ def login():
             return redirect(url_for("login"))
 
         try:
+            db = get_supabase()
             result = (
-                supabase.table("users")
+                db.table("users")
                 .select("id,email,username,age,password_hash")
                 .eq("email", email)
                 .limit(1)
@@ -228,6 +257,7 @@ def upload_prescription():
     storage_path = f"{session['user_id']}/{uuid.uuid4().hex}_{file_name}"
 
     try:
+        db = get_supabase()
         file_bytes = image.read()
         if not file_bytes:
             flash("Uploaded file is empty.", "error")
@@ -236,7 +266,7 @@ def upload_prescription():
         upload_to_storage(storage_path, file_bytes, image.mimetype or "application/octet-stream")
         public_url = build_public_url(storage_path)
 
-        supabase.table("prescriptions").insert(
+        db.table("prescriptions").insert(
             {
                 "user_id": session["user_id"],
                 "prescription_date": prescription_date,
@@ -257,8 +287,9 @@ def upload_prescription():
 def prescriptions():
     items = []
     try:
+        db = get_supabase()
         result = (
-            supabase.table("prescriptions")
+            db.table("prescriptions")
             .select("id,prescription_date,image_url,created_at,users(username,email,age)")
             .order("prescription_date", desc=True)
             .execute()
